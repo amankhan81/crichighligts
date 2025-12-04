@@ -3,77 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CricketScan AI - FHD Transitions</title>
+    <title>CricketScan AI - Pro</title>
     
-    <!-- 
-      === OFFLINE INSTRUCTIONS ===
-      To work offline, download these files to a 'libs' folder and uncomment the local lines below, 
-      while removing the internet lines.
-    -->
+    <!-- 1. Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- 1. Tailwind CSS -->
-    <!-- Online: --> <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Offline: <script src="./libs/tailwind.js"></script> -->
+    <!-- 2. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        slate: { 850: '#151e2e', 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
     
-    <!-- 2. React & ReactDOM -->
-    <!-- Online: -->
+    <!-- 3. React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Offline: 
-    <script src="./libs/react.js"></script>
-    <script src="./libs/react-dom.js"></script> 
-    -->
     
-    <!-- 3. Babel -->
-    <!-- Online: --> <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Offline: <script src="./libs/babel.js"></script> -->
+    <!-- 4. Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. Lucide Icons -->
-    <!-- Online: --> <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Offline: <script src="./libs/lucide.js"></script> -->
+    <!-- 5. Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-        .group-box:hover .group-box-hover\:opacity-100 { opacity: 1; }
+        body { background-color: #020617; }
+        
+        /* Sleek Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #34d399;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        
+        /* Animations */
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-enter { animation: fade-in 0.3s ease-out forwards; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100">
-    <div id="root"></div>
+<body class="text-slate-200 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+    <div id="root" class="h-screen w-screen flex flex-col"></div>
 
     <script type="text/babel">
-        // --- FIX: EXPLICITLY CAPTURE GLOBALS ---
         const React = window.React;
         const ReactDOM = window.ReactDOM;
 
-        // Safety check to ensure libraries loaded
         if (!React || !ReactDOM) {
-            document.getElementById('root').innerHTML = `
-                <div style="padding: 20px; color: #ef4444; font-family: sans-serif;">
-                    <h2 style="font-size: 24px; margin-bottom: 10px;">Critical Error: Libraries Failed to Load</h2>
-                    <p>React or ReactDOM could not be found. Please check:</p>
-                    <ul style="margin-top: 10px; list-style: disc; padding-left: 20px;">
-                        <li>If online: Check your internet connection.</li>
-                        <li>If offline: Ensure you have downloaded the files into a 'libs' folder and uncommented the offline scripts in the HTML code.</li>
-                    </ul>
-                </div>
-            `;
-            throw new Error("React/ReactDOM not found");
+            throw new Error("React/ReactDOM not found. Check internet connection or offline setup.");
         }
 
         const { useState, useRef, useEffect } = React;
         
-        // --- FIXED ICON COMPONENT ---
+        // --- ICON COMPONENT ---
         const Icon = ({ name, size = 24, className }) => {
             const ref = useRef(null);
-
             useEffect(() => {
                 if (!window.lucide || !ref.current) return;
                 ref.current.innerHTML = '';
                 const pascalName = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('');
                 const iconData = window.lucide.icons[pascalName];
-
                 if (iconData) {
                     const svgElement = window.lucide.createElement(iconData);
                     svgElement.setAttribute('width', size);
@@ -85,7 +106,6 @@
                     ref.current.appendChild(svgElement);
                 }
             }, [name, size, className]);
-
             return <span ref={ref} className="inline-flex items-center justify-center"></span>;
         };
 
@@ -147,13 +167,13 @@
                         setProgress(0);
                         setIsPlaying(false);
                     } catch (err) {
-                        alert("Error loading video file: " + err.message);
+                        alert("Error loading: " + err.message);
                     }
                 }
             };
 
             const resetApp = () => {
-                if (window.confirm("Start over? This will clear the video, triggers, and highlights.")) {
+                if (window.confirm("Start over? This will clear the current project.")) {
                     if (scanRequestRef.current) cancelAnimationFrame(scanRequestRef.current);
                     if (videoSrc) URL.revokeObjectURL(videoSrc);
                     setVideoSrc(null);
@@ -169,7 +189,6 @@
                 }
             };
 
-            // New delete function
             const deleteHighlight = (indexToDelete) => {
                 setHighlights(prev => prev.filter((_, index) => index !== indexToDelete));
             };
@@ -226,16 +245,15 @@
             };
 
             const analyzeRegionForTrigger = () => {
-                if (!videoRef.current || !canvasRef.current || !containerRef.current) return;
+                if (!videoRef.current || !canvasRef.current) return;
                 const video = videoRef.current;
                 const canvas = canvasRef.current;
                 const ctx = canvas.getContext('2d');
-                
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // REVERTED: Using simple container scaling which proved more reliable for hit-testing
+                // Simple scaling for robustness
                 const displayRect = containerRef.current.getBoundingClientRect();
                 const scaleX = video.videoWidth / displayRect.width;
                 const scaleY = video.videoHeight / displayRect.height;
@@ -253,7 +271,7 @@
                     setTempTriggerColor(avgColor);
                     setShowTriggerModal(true);
                 } catch (e) {
-                    console.error("Failed to get image data", e);
+                    console.error("Image Data Error", e);
                     setCurrentRect(null);
                 }
             };
@@ -318,7 +336,6 @@
                             canvas.height = video.videoHeight;
                             ctx.drawImage(video, 0, 0);
 
-                            // REVERTED: Simple scaling logic
                             const displayRect = containerRef.current.getBoundingClientRect();
                             const scaleX = video.videoWidth / displayRect.width;
                             const scaleY = video.videoHeight / displayRect.height;
@@ -332,7 +349,6 @@
                                     w: Math.floor(trigger.rect.w * scaleX),
                                     h: Math.floor(trigger.rect.h * scaleY),
                                 };
-
                                 if (region.w <= 0 || region.h <= 0) continue;
 
                                 const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
@@ -350,7 +366,6 @@
                                 setHighlights(prev => {
                                     const last = prev[prev.length - 1];
                                     if (last && (vTime - last.eventTime < 10)) return prev;
-                                    
                                     const adjustedStartTime = Math.max(0, vTime - preRoll);
                                     return [...prev, { 
                                         time: adjustedStartTime,
@@ -367,7 +382,6 @@
                 scanRequestRef.current = requestAnimationFrame(processLoop);
             };
 
-            // --- EXPORT LOGIC WITH TRANSITIONS & 10MBPS ---
             const exportHighlights = async () => {
                 if (highlights.length === 0 || !videoRef.current) return;
                 setIsExporting(true);
@@ -529,191 +543,253 @@
             };
 
             return (
-                <div className="flex flex-col h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
-                    <header className="h-16 border-b border-slate-700 bg-slate-800 flex items-center justify-between px-6 shrink-0 relative z-10">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                                <Icon name="video" size={20} className="text-white" />
+                <div className="flex flex-col h-screen overflow-hidden bg-slate-950 font-sans">
+                    {/* --- HEADER --- */}
+                    <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-6 shrink-0 relative z-20 shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <Icon name="video" size={20} className="text-white drop-shadow-sm" />
                             </div>
-                            <h1 className="font-bold text-xl tracking-tight">CricketScan <span className="text-green-400 font-normal">AI</span></h1>
+                            <div>
+                                <h1 className="font-bold text-xl tracking-tight leading-none text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">CricketScan</h1>
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">AI Highlights</span>
+                            </div>
                         </div>
                         
-                        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400">
-                            Created by: Amanullah Khan
+                        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hidden md:block">
+                            Created by: <span className="text-slate-400">Amanullah Khan</span>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             {!videoSrc && (
-                                <label key={resetKey} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-full cursor-pointer transition">
-                                    <Icon name="upload" size={16} />
-                                    <span className="text-sm font-medium">Upload Match Video</span>
+                                <label key={resetKey} className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 rounded-full cursor-pointer transition shadow-lg shadow-blue-500/20 border border-white/10">
+                                    <Icon name="upload" size={18} className="group-hover:scale-110 transition-transform" />
+                                    <span className="text-sm font-semibold">Upload Video</span>
                                     <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
                                 </label>
                             )}
                             {videoSrc && !isScanning && !isExporting && (
                                 <>
-                                    <button onClick={resetApp} className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-red-600 rounded-full font-medium transition text-slate-200 hover:text-white" title="Reset Project">
-                                        <Icon name="rotate-ccw" size={16} />
-                                        <span className="text-xs">Reset</span>
+                                    <button onClick={resetApp} className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition text-xs font-medium" title="Reset Project">
+                                        <Icon name="rotate-ccw" size={14} />
+                                        Reset
                                     </button>
-                                    <button onClick={startScan} disabled={triggers.length === 0} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${triggers.length > 0 ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}>
-                                        <Icon name="zap" size={16} className="fill-current" />
-                                        Start {scanSpeed}x Scan
+                                    <button onClick={startScan} disabled={triggers.length === 0} 
+                                        className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition shadow-lg border border-white/10 ${triggers.length > 0 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border-transparent'}`}>
+                                        <Icon name="zap" size={18} className={triggers.length > 0 ? "fill-current" : ""} />
+                                        Start Scan
                                     </button>
                                 </>
                             )}
                             {(isScanning || isExporting) && (
-                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-full">
-                                    <div className="w-4 h-4 border-2 border-green-500 border-t-transparent animate-spin rounded-full"></div>
-                                    <span className="text-sm text-green-400 font-mono">
-                                        {isExporting ? 'Exporting FHD Transitions' : 'Fast Scanning'} {Math.round(progress)}%
-                                    </span>
+                                <div className="flex items-center gap-4 px-5 py-2 bg-slate-900 border border-slate-700 rounded-full shadow-inner">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                        </div>
+                                        <span className="text-sm font-mono text-emerald-400">
+                                            {isExporting ? 'Exporting...' : 'Scanning...'} {Math.round(progress)}%
+                                        </span>
+                                    </div>
                                     {isScanning && (
-                                        <button onClick={stopScan} className="ml-2 text-xs text-red-400 hover:text-red-300">Stop</button>
+                                        <button onClick={stopScan} className="p-1 rounded-full hover:bg-white/10 text-red-400 hover:text-red-300 transition"><Icon name="x" size={14} /></button>
                                     )}
                                 </div>
                             )}
                         </div>
                     </header>
 
+                    {/* --- MAIN LAYOUT --- */}
                     <div className="flex flex-1 overflow-hidden">
-                        <div className="flex-1 bg-black relative flex flex-col justify-center items-center overflow-hidden group">
+                        
+                        {/* LEFT: Video Stage */}
+                        <div className="flex-1 bg-black/50 relative flex flex-col justify-center items-center overflow-hidden group">
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/50 to-slate-950 -z-10"></div>
+                            
                             {!videoSrc ? (
-                                <div className="text-center text-slate-500 p-8 border-2 border-dashed border-slate-700 rounded-xl">
-                                    <Icon name="upload" size={48} className="mx-auto mb-4 opacity-50" />
-                                    <p className="text-lg">Upload a video to get started</p>
-                                    <p className="text-sm opacity-60">Supports MP4, WebM</p>
+                                <div className="text-center p-12 border-2 border-dashed border-slate-700/50 rounded-3xl bg-slate-900/30 backdrop-blur-sm max-w-md mx-6">
+                                    <div className="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-500">
+                                        <Icon name="film" size={40} />
+                                    </div>
+                                    <h3 className="text-xl font-semibold text-slate-200 mb-2">No Video Selected</h3>
+                                    <p className="text-slate-500">Upload a match recording (MP4/WebM) to start detecting highlights.</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div ref={containerRef} className="relative shadow-2xl max-h-full aspect-video"
+                                    <div ref={containerRef} className="relative shadow-2xl shadow-black/80 w-full max-w-6xl aspect-video bg-black rounded-lg overflow-hidden border border-slate-800"
                                         onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={endDrawing}
                                         style={{ cursor: isDrawing ? 'crosshair' : 'default' }}>
-                                        <video ref={videoRef} src={videoSrc} className="max-h-full max-w-full pointer-events-none" 
+                                        <video ref={videoRef} src={videoSrc} className="w-full h-full object-contain" 
                                             onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} crossOrigin="anonymous" playsInline 
                                         />
                                         <canvas ref={canvasRef} className="hidden" />
+                                        
+                                        {/* Drawing Box */}
                                         {currentRect && (
-                                            <div className="absolute border-2 border-green-400 bg-green-400/20"
+                                            <div className="absolute border-2 border-emerald-400 bg-emerald-400/20 backdrop-blur-[1px] shadow-[0_0_15px_rgba(52,211,153,0.3)]"
                                                 style={{ left: currentRect.x, top: currentRect.y, width: currentRect.w, height: currentRect.h }} />
                                         )}
+                                        
+                                        {/* Trigger Overlays */}
                                         {triggers.map(t => (
-                                            <div key={t.id} className="absolute border-2 border-yellow-400/50 hover:border-yellow-400 hover:bg-yellow-400/10 group-box transition-colors"
+                                            <div key={t.id} className="absolute border-2 border-yellow-400/60 bg-yellow-400/5 hover:bg-yellow-400/20 transition-colors"
                                                 style={{ left: t.rect.x, top: t.rect.y, width: t.rect.w, height: t.rect.h }}>
-                                                <span className="absolute -top-6 left-0 bg-yellow-400 text-black text-xs font-bold px-1 rounded shadow-sm opacity-0 group-box-hover:opacity-100 transition-opacity">
+                                                <span className="absolute -top-7 left-0 bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
                                                     {t.label}
                                                 </span>
                                             </div>
                                         ))}
-                                        <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity flex items-center gap-4 ${isExporting ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
-                                            <button onClick={togglePlay} className="p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md">
-                                                {isPlaying ? <Icon name="pause" size={20} className="text-white" /> : <Icon name="play" size={20} className="text-white" />}
+
+                                        {/* Video Controls */}
+                                        <div className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300 flex items-center gap-5 ${isExporting ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
+                                            <button onClick={togglePlay} className="h-10 w-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md text-white transition">
+                                                {isPlaying ? <Icon name="pause" size={20} className="fill-current" /> : <Icon name="play" size={20} className="fill-current ml-0.5" />}
                                             </button>
-                                            <input type="range" min="0" max={duration || 100} value={currentTime} 
-                                                onChange={(e) => { const t = Number(e.target.value); videoRef.current.currentTime = t; setCurrentTime(t); }}
-                                                className="flex-1 accent-green-500 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                            />
-                                            <span className="text-xs font-mono text-white/80">{formatTime(currentTime)} / {formatTime(duration)}</span>
+                                            <div className="flex-1 flex flex-col gap-1.5">
+                                                <input type="range" min="0" max={duration || 100} value={currentTime} 
+                                                    onChange={(e) => { const t = Number(e.target.value); videoRef.current.currentTime = t; setCurrentTime(t); }}
+                                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                />
+                                                <div className="flex justify-between text-[10px] font-medium font-mono text-slate-300">
+                                                    <span>{formatTime(currentTime)}</span>
+                                                    <span>{formatTime(duration)}</span>
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        {/* Export Overlay */}
                                         {isExporting && (
-                                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
-                                                <div className="text-center space-y-4">
-                                                    <Icon name="film" size={64} className="text-green-500 animate-pulse mx-auto" />
-                                                    <h2 className="text-2xl font-bold text-white">Exporting Video</h2>
-                                                    <p className="text-slate-400">10Mbps FHD + Transitions...</p>
-                                                    <p className="text-slate-500 text-sm">Do not close this tab</p>
+                                            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                                                <div className="text-center space-y-6 animate-enter">
+                                                    <div className="relative">
+                                                        <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full"></div>
+                                                        <Icon name="film" size={64} className="text-emerald-500 relative z-10 animate-pulse mx-auto" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-2xl font-bold text-white mb-2">Exporting Highlight Reel</h2>
+                                                        <p className="text-slate-400">Rendering 1080p WebM • Adding Transitions</p>
+                                                    </div>
+                                                    <div className="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden mx-auto">
+                                                        <div className="h-full bg-emerald-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Helper Hint */}
                                     {triggers.length === 0 && (
-                                        <div className="absolute top-6 bg-black/80 backdrop-blur border border-slate-700 text-slate-200 px-6 py-3 rounded-full shadow-xl flex items-center gap-3 animate-fade-in-up pointer-events-none">
-                                            <Icon name="crosshair" size={20} className="text-green-400" />
-                                            <div>
-                                                <p className="text-sm font-semibold">How to create a trigger:</p>
-                                                <p className="text-xs opacity-70">Pause on "SIX" → Draw box around the unique color.</p>
-                                            </div>
+                                        <div className="absolute top-8 bg-black/60 backdrop-blur-md border border-white/10 text-slate-200 px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-enter pointer-events-none">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                                            <p className="text-sm font-medium">Pause video on event &rarr; Draw box to create trigger</p>
                                         </div>
                                     )}
                                 </>
                             )}
                         </div>
 
-                        <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col shrink-0">
-                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
-                                <div className="flex items-center gap-2 mb-3 text-slate-300">
-                                    <Icon name="settings" size={16} />
-                                    <h2 className="text-sm font-semibold uppercase tracking-wider">Scan Settings</h2>
+                        {/* RIGHT: Sidebar */}
+                        <div className="w-80 bg-slate-900/90 backdrop-blur-xl border-l border-slate-800 flex flex-col shrink-0 z-10">
+                            
+                            {/* Panel: Settings */}
+                            <div className="p-5 border-b border-slate-800">
+                                <div className="flex items-center gap-2 mb-4 text-slate-100">
+                                    <Icon name="sliders" size={16} className="text-emerald-400" />
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">Configuration</h2>
                                 </div>
-                                <div className="space-y-4">
+                                <div className="space-y-5">
                                     <div>
-                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
-                                            <span>Scan Speed</span><span className="text-green-400">{scanSpeed}x</span>
+                                        <div className="flex justify-between text-xs font-medium text-slate-400 mb-2">
+                                            <span>Scan Speed</span><span className="text-emerald-400">{scanSpeed}x</span>
                                         </div>
-                                        <input type="range" min="1" max="8" step="1" value={scanSpeed} onChange={(e) => setScanSpeed(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                        <input type="range" min="1" max="8" step="1" value={scanSpeed} onChange={(e) => setScanSpeed(Number(e.target.value))} className="w-full" />
                                     </div>
                                     <div>
-                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
-                                            <span>Pre-event Capture</span><span className="text-green-400">{preRoll} sec</span>
+                                        <div className="flex justify-between text-xs font-medium text-slate-400 mb-2">
+                                            <span>Pre-roll Capture</span><span className="text-emerald-400">{preRoll}s</span>
                                         </div>
-                                        <input type="range" min="0" max="30" step="1" value={preRoll} onChange={(e) => setPreRoll(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                        <input type="range" min="0" max="30" step="1" value={preRoll} onChange={(e) => setPreRoll(Number(e.target.value))} className="w-full" />
                                     </div>
                                     <div>
-                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
-                                            <span>Clip Length</span><span className="text-green-400">{clipDuration} sec</span>
+                                        <div className="flex justify-between text-xs font-medium text-slate-400 mb-2">
+                                            <span>Clip Duration</span><span className="text-emerald-400">{clipDuration}s</span>
                                         </div>
-                                        <input type="range" min="5" max="60" step="1" value={clipDuration} onChange={(e) => setClipDuration(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                        <input type="range" min="5" max="60" step="1" value={clipDuration} onChange={(e) => setClipDuration(Number(e.target.value))} className="w-full" />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                            {/* Panel: Triggers */}
+                            <div className="p-5 border-b border-slate-800 bg-slate-900/50">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Triggers</h2>
-                                    <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full text-slate-400">{triggers.length}</span>
+                                    <div className="flex items-center gap-2 text-slate-100">
+                                        <Icon name="scan-line" size={16} className="text-emerald-400" />
+                                        <h2 className="text-xs font-bold uppercase tracking-widest">Triggers</h2>
+                                    </div>
+                                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">{triggers.length}</span>
                                 </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                    {triggers.length === 0 ? <div className="text-center py-6 text-slate-500 text-sm italic">No triggers set.</div> : 
+                                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                                    {triggers.length === 0 ? <div className="text-center py-4 text-slate-600 text-xs italic">No triggers defined yet.</div> : 
                                     triggers.map(t => (
-                                        <div key={t.id} className="flex items-center justify-between bg-slate-700/50 p-2 rounded border border-slate-600">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: rgbToHex(t.color) }}></div>
-                                                <span className="text-sm font-medium">{t.label}</span>
+                                        <div key={t.id} className="flex items-center justify-between bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50 hover:border-slate-600 transition group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-3 h-3 rounded-full shadow-sm ring-1 ring-white/10" style={{ backgroundColor: rgbToHex(t.color) }}></div>
+                                                <span className="text-sm font-medium text-slate-300">{t.label}</span>
                                             </div>
-                                            <button onClick={() => setTriggers(triggers.filter(tr => tr.id !== t.id))} className="text-slate-500 hover:text-red-400"><Icon name="trash-2" size={12} /></button>
+                                            <button onClick={() => setTriggers(triggers.filter(tr => tr.id !== t.id))} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="trash-2" size={14} /></button>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="flex-1 flex flex-col overflow-hidden">
-                                <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                                    <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Highlights</h2>
+                            {/* Panel: Highlights */}
+                            <div className="flex-1 flex flex-col overflow-hidden bg-slate-950/30">
+                                <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                                    <div className="flex items-center gap-2 text-slate-100">
+                                        <Icon name="clapperboard" size={16} className="text-emerald-400" />
+                                        <h2 className="text-xs font-bold uppercase tracking-widest">Highlights</h2>
+                                    </div>
                                     {highlights.length > 0 && (
-                                        <button onClick={exportHighlights} disabled={isExporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <button onClick={exportHighlights} disabled={isExporting} 
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-[10px] font-bold uppercase tracking-wider transition shadow-lg shadow-indigo-900/50 disabled:opacity-50 disabled:cursor-not-allowed">
                                             {isExporting ? <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Icon name="download" size={12} />}
-                                            Export Reel
+                                            Export
                                         </button>
                                     )}
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                                    {highlights.length === 0 ? <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-60"><Icon name="clock" size={32} className="mb-2" /><p className="text-sm">Scan result will appear here</p></div> : 
+                                <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                                    {highlights.length === 0 ? 
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-50 space-y-3">
+                                            <Icon name="history" size={40} strokeWidth={1.5} />
+                                            <p className="text-xs font-medium">Timeline empty</p>
+                                        </div> 
+                                    : 
                                     highlights.map((h, i) => (
-                                        <div key={i} className="w-full flex items-center gap-2 p-2 bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 rounded-lg transition group">
-                                            <button onClick={() => jumpToTime(h.time)} className="flex-1 flex items-center gap-3 text-left">
-                                                <div className="relative w-20 h-12 bg-black rounded overflow-hidden shrink-0 border border-slate-600">
-                                                    {h.thumbnail && <img src={h.thumbnail} className="w-full h-full object-cover" alt="thumb"/>}
-                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition"><Icon name="play" size={16} className="text-white opacity-80" /></div>
+                                        <div key={i} className="group relative w-full flex items-center gap-3 p-2 bg-slate-800/40 hover:bg-slate-800 border border-slate-800 hover:border-slate-600 rounded-xl transition-all duration-200 cursor-pointer overflow-hidden">
+                                            {/* Click area to jump */}
+                                            <div className="flex-1 flex items-center gap-3" onClick={() => jumpToTime(h.time)}>
+                                                <div className="relative w-20 h-14 bg-black rounded-lg overflow-hidden shrink-0 border border-slate-700/50 shadow-sm">
+                                                    {h.thumbnail && <img src={h.thumbnail} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" alt="thumb"/>}
+                                                    <div className="absolute inset-0 flex items-center justify-center"><Icon name="play-circle" size={20} className="text-white opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 drop-shadow-md" /></div>
                                                 </div>
-                                                <div>
+                                                <div className="flex flex-col gap-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${h.type.toLowerCase().includes('six') ? 'bg-purple-500 text-white' : h.type.toLowerCase().includes('four') ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>{h.type}</span>
-                                                        <span className="text-xs font-mono text-slate-400">@{formatTime(h.eventTime)}</span>
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-white/5
+                                                            ${h.type.toLowerCase().includes('six') ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 
+                                                              h.type.toLowerCase().includes('four') ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 
+                                                              'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
+                                                            {h.type}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-slate-500">@{formatTime(h.eventTime)}</span>
                                                     </div>
-                                                    <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">Starts at {formatTime(h.time)}</p>
+                                                    <p className="text-[10px] text-slate-400 line-clamp-1">Starts: <span className="font-mono text-slate-300">{formatTime(h.time)}</span></p>
                                                 </div>
-                                            </button>
-                                            <button onClick={(e) => { e.stopPropagation(); deleteHighlight(i); }} className="p-2 text-slate-500 hover:text-red-400 transition">
+                                            </div>
+                                            
+                                            {/* Delete Button */}
+                                            <button onClick={(e) => { e.stopPropagation(); deleteHighlight(i); }} 
+                                                className="absolute right-2 p-2 rounded-lg bg-slate-950 text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 shadow-lg">
                                                 <Icon name="trash-2" size={16} />
                                             </button>
                                         </div>
@@ -722,24 +798,42 @@
                             </div>
                         </div>
 
+                        {/* Modal: New Trigger */}
                         {showTriggerModal && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                                <div className="bg-slate-800 border border-slate-600 p-6 rounded-xl shadow-2xl w-80 transform transition-all scale-100">
-                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Icon name="check-circle" size={20} className="text-green-400" /> New Trigger</h3>
-                                    <div className="mb-4">
-                                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Selected Color</label>
-                                        <div className="flex items-center gap-3 p-2 bg-slate-900 rounded border border-slate-700">
-                                            <div className="w-8 h-8 rounded shadow-sm border border-slate-600" style={{ backgroundColor: tempTriggerColor ? rgbToHex(tempTriggerColor) : '#000' }} />
-                                            <span className="font-mono text-sm text-slate-300">{tempTriggerColor ? rgbToHex(tempTriggerColor) : '...'}</span>
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-enter">
+                                <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
+                                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
+                                        <Icon name="scan-search" size={24} className="text-emerald-400" /> 
+                                        New Event Trigger
+                                    </h3>
+                                    
+                                    <div className="mb-6 space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detected Color</label>
+                                        <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                            <div className="w-10 h-10 rounded-lg shadow-sm border border-slate-700" style={{ backgroundColor: tempTriggerColor ? rgbToHex(tempTriggerColor) : '#000' }} />
+                                            <div className="flex flex-col">
+                                                <span className="font-mono text-sm text-slate-300">{tempTriggerColor ? rgbToHex(tempTriggerColor) : '...'}</span>
+                                                <span className="text-[10px] text-slate-500">Matches this pixel color</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="mb-6">
-                                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Event Name</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {['SIX', 'FOUR', 'WICKET', 'Wide'].map(preset => <button key={preset} onClick={() => saveTrigger(preset)} className="py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition">{preset}</button>)}
+
+                                    <div className="mb-8">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Assign Label</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {['SIX', 'FOUR', 'WICKET', 'Wide'].map(preset => (
+                                                <button key={preset} onClick={() => saveTrigger(preset)} 
+                                                    className="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-sm font-medium transition border border-slate-700 hover:border-slate-500">
+                                                    {preset}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                    <button onClick={() => { setShowTriggerModal(false); setCurrentRect(null); }} className="w-full py-2 text-sm text-slate-400 hover:text-white transition">Cancel</button>
+                                    
+                                    <button onClick={() => { setShowTriggerModal(false); setCurrentRect(null); }} className="w-full py-3 text-sm font-medium text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800">
+                                        Cancel
+                                    </button>
                                 </div>
                             </div>
                         )}
