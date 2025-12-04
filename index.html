@@ -169,6 +169,11 @@
                 }
             };
 
+            // New delete function
+            const deleteHighlight = (indexToDelete) => {
+                setHighlights(prev => prev.filter((_, index) => index !== indexToDelete));
+            };
+
             const handleTimeUpdate = () => {
                 if (videoRef.current && !isScanning && !isExporting) {
                     setCurrentTime(videoRef.current.currentTime);
@@ -226,44 +231,21 @@
                 const canvas = canvasRef.current;
                 const ctx = canvas.getContext('2d');
                 
-                // 1. Snapshot the video
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // 2. Get Layout Coordinates
-                const containerRect = containerRef.current.getBoundingClientRect();
-                const videoRect = video.getBoundingClientRect(); // This gives the *actual* rendered video size
+                // REVERTED: Using simple container scaling which proved more reliable for hit-testing
+                const displayRect = containerRef.current.getBoundingClientRect();
+                const scaleX = video.videoWidth / displayRect.width;
+                const scaleY = video.videoHeight / displayRect.height;
 
-                // 3. Calculate offsets (if video is letterboxed/centered)
-                const offsetX = videoRect.left - containerRect.left;
-                const offsetY = videoRect.top - containerRect.top;
-
-                // 4. Calculate Scale Factors relative to the VIDEO element, not the container
-                const scaleX = video.videoWidth / videoRect.width;
-                const scaleY = video.videoHeight / videoRect.height;
-
-                // 5. Map Mouse Rect to Video Pixels
-                // We subtract the offsets to make coordinates relative to the video, not the container
-                const rawX = (currentRect.x - offsetX) * scaleX;
-                const rawY = (currentRect.y - offsetY) * scaleY;
-                const rawW = currentRect.w * scaleX;
-                const rawH = currentRect.h * scaleY;
-
-                // 6. Clamp to valid bounds (prevent crash if user selected black bars)
-                const x = Math.max(0, Math.floor(rawX));
-                const y = Math.max(0, Math.floor(rawY));
-                // Ensure width/height don't go off the canvas
-                const w = Math.min(Math.floor(rawW), video.videoWidth - x);
-                const h = Math.min(Math.floor(rawH), video.videoHeight - y);
-
-                if (w <= 0 || h <= 0) {
-                    alert("Please select an area inside the video, not the black borders.");
-                    setCurrentRect(null);
-                    return;
-                }
-
-                const region = { x, y, w, h };
+                const region = {
+                    x: Math.floor(currentRect.x * scaleX),
+                    y: Math.floor(currentRect.y * scaleY),
+                    w: Math.floor(currentRect.w * scaleX),
+                    h: Math.floor(currentRect.h * scaleY),
+                };
 
                 try {
                     const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
@@ -315,8 +297,6 @@
 
                 let lastCheckTime = -1;
                 const checkInterval = 0.5;
-                
-                // Track last match time to prevent duplicate detections of the same event
                 let lastMatchTime = -10; 
 
                 const processLoop = () => {
@@ -331,42 +311,31 @@
                     if (vTime - lastCheckTime >= checkInterval) {
                         lastCheckTime = vTime;
                         
-                        // --- COOLDOWN LOGIC START ---
-                        // If we found a match recently (within 10 seconds), SKIP scanning.
                         if (vTime - lastMatchTime < 10) {
-                            // Do nothing, just wait for cooldown to pass
+                            // Cooldown active
                         } else {
-                            // Safe to scan
                             canvas.width = video.videoWidth;
                             canvas.height = video.videoHeight;
                             ctx.drawImage(video, 0, 0);
 
-                            // Improved Scan Logic with Corrected Coordinates
-                            const containerRect = containerRef.current.getBoundingClientRect();
-                            const videoRect = video.getBoundingClientRect();
-                            
-                            const offsetX = videoRect.left - containerRect.left;
-                            const offsetY = videoRect.top - containerRect.top;
-                            const scaleX = video.videoWidth / videoRect.width;
-                            const scaleY = video.videoHeight / videoRect.height;
+                            // REVERTED: Simple scaling logic
+                            const displayRect = containerRef.current.getBoundingClientRect();
+                            const scaleX = video.videoWidth / displayRect.width;
+                            const scaleY = video.videoHeight / displayRect.height;
 
                             let matchedLabel = null;
 
                             for (let trigger of triggers) {
-                                // Map visual rect to video pixels
-                                const rawX = (trigger.rect.x - offsetX) * scaleX;
-                                const rawY = (trigger.rect.y - offsetY) * scaleY;
-                                const rawW = trigger.rect.w * scaleX;
-                                const rawH = trigger.rect.h * scaleY;
+                                const region = {
+                                    x: Math.floor(trigger.rect.x * scaleX),
+                                    y: Math.floor(trigger.rect.y * scaleY),
+                                    w: Math.floor(trigger.rect.w * scaleX),
+                                    h: Math.floor(trigger.rect.h * scaleY),
+                                };
 
-                                const x = Math.max(0, Math.floor(rawX));
-                                const y = Math.max(0, Math.floor(rawY));
-                                const w = Math.min(Math.floor(rawW), video.videoWidth - x);
-                                const h = Math.min(Math.floor(rawH), video.videoHeight - y);
+                                if (region.w <= 0 || region.h <= 0) continue;
 
-                                if (w <= 0 || h <= 0) continue;
-
-                                const imageData = ctx.getImageData(x, y, w, h);
+                                const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
                                 const avgColor = getAverageColor(imageData);
                                 const distance = getColorDistance(avgColor, trigger.color);
 
@@ -377,10 +346,9 @@
                             }
 
                             if (matchedLabel) {
-                                lastMatchTime = vTime; // UPDATE COOLDOWN TIMESTAMP
+                                lastMatchTime = vTime; 
                                 setHighlights(prev => {
                                     const last = prev[prev.length - 1];
-                                    // Extra safety check in React state
                                     if (last && (vTime - last.eventTime < 10)) return prev;
                                     
                                     const adjustedStartTime = Math.max(0, vTime - preRoll);
@@ -393,7 +361,6 @@
                                 });
                             }
                         }
-                        // --- COOLDOWN LOGIC END ---
                     }
                     scanRequestRef.current = requestAnimationFrame(processLoop);
                 };
@@ -414,15 +381,12 @@
                 video.muted = false;
                 video.volume = 1.0;
 
-                // 1. SETUP CANVAS PIPELINE FOR TRANSITIONS
                 const exportCanvas = document.createElement('canvas');
-                exportCanvas.width = video.videoWidth; // Use source resolution (FHD/4K etc)
+                exportCanvas.width = video.videoWidth; 
                 exportCanvas.height = video.videoHeight;
-                const ctx = exportCanvas.getContext('2d', { alpha: false }); // Optimize for video
+                const ctx = exportCanvas.getContext('2d', { alpha: false }); 
 
-                // 2. SETUP STREAMS
                 let audioStream;
-                // We need to capture the audio stream from the video element
                 if (video.captureStream) audioStream = video.captureStream();
                 else if (video.mozCaptureStream) audioStream = video.mozCaptureStream();
                 else {
@@ -431,22 +395,20 @@
                     return;
                 }
 
-                // Get streams
                 const audioTracks = audioStream.getAudioTracks();
-                const canvasStream = exportCanvas.captureStream(60); // Request 60FPS from canvas
+                const canvasStream = exportCanvas.captureStream(60); 
                 const finalStream = new MediaStream([
                     ...canvasStream.getVideoTracks(),
                     ...(audioTracks.length > 0 ? [audioTracks[0]] : [])
                 ]);
 
-                // 3. RECORDER SETUP (WebM + 10Mbps)
                 let mimeType = "video/webm;codecs=vp9,opus"; 
                 if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm;codecs=vp8,opus";
                 if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm"; 
 
                 const recorder = new MediaRecorder(finalStream, { 
                     mimeType, 
-                    videoBitsPerSecond: 10000000 // 10 Mbps FHD
+                    videoBitsPerSecond: 10000000 
                 });
 
                 const chunks = [];
@@ -459,28 +421,21 @@
 
                 const sortedHighlights = [...highlights].sort((a, b) => a.time - b.time);
                 let animationFrameId;
-
-                // 4. RENDER LOOP (Handles Drawing + Transitions)
-                // This variable tracks which clip we are currently rendering for transition logic
                 let currentClipData = null;
 
                 const renderLoop = () => {
                     if (!video.paused && !video.ended && currentClipData) {
-                        // Draw Video Frame
                         ctx.drawImage(video, 0, 0, exportCanvas.width, exportCanvas.height);
                         
-                        // Calculate Transition Overlay
                         const t = video.currentTime;
                         const { start, end } = currentClipData;
-                        const fadeDuration = 0.5; // 0.5s fade
+                        const fadeDuration = 0.5;
 
                         if (t >= start && t < start + fadeDuration) {
-                            // Fade In (Black -> Transparent)
                             const alpha = 1 - ((t - start) / fadeDuration);
                             ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
                             ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
                         } else if (t > end - fadeDuration && t <= end) {
-                            // Fade Out (Transparent -> Black)
                             const alpha = 1 - ((end - t) / fadeDuration);
                             ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
                             ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
@@ -489,7 +444,6 @@
                     animationFrameId = requestAnimationFrame(renderLoop);
                 };
                 
-                // Start the render loop immediately
                 renderLoop();
 
                 for (let i = 0; i < sortedHighlights.length; i++) {
@@ -497,10 +451,8 @@
                     const start = h.time;
                     const end = Math.min(video.duration, start + clipDuration);
                     
-                    // Update current clip data for the render loop
                     currentClipData = { start, end };
 
-                    // Pre-roll logic
                     const preBuffer = 2.0; 
                     const seekTarget = Math.max(0, start - preBuffer);
                     const isRollingStart = start > preBuffer; 
@@ -544,7 +496,6 @@
                     setProgress(Math.round(((i + 1) / sortedHighlights.length) * 100));
                 }
 
-                // Cleanup
                 cancelAnimationFrame(animationFrameId);
                 recorder.stop();
                 await new Promise(resolve => { recorder.onstop = resolve; });
@@ -587,7 +538,6 @@
                             <h1 className="font-bold text-xl tracking-tight">CricketScan <span className="text-green-400 font-normal">AI</span></h1>
                         </div>
                         
-                        {/* Added Credit Text */}
                         <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400">
                             Created by: Amanullah Khan
                         </div>
@@ -749,20 +699,24 @@
                                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                                     {highlights.length === 0 ? <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-60"><Icon name="clock" size={32} className="mb-2" /><p className="text-sm">Scan result will appear here</p></div> : 
                                     highlights.map((h, i) => (
-                                        <button key={i} onClick={() => jumpToTime(h.time)} className="w-full flex items-center gap-3 p-2 bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 rounded-lg transition group text-left">
-                                            <div className="relative w-20 h-12 bg-black rounded overflow-hidden shrink-0 border border-slate-600">
-                                                {h.thumbnail && <img src={h.thumbnail} className="w-full h-full object-cover" alt="thumb"/>}
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition"><Icon name="play" size={16} className="text-white opacity-80" /></div>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${h.type.toLowerCase().includes('six') ? 'bg-purple-500 text-white' : h.type.toLowerCase().includes('four') ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>{h.type}</span>
-                                                    <span className="text-xs font-mono text-slate-400">@{formatTime(h.eventTime)}</span>
+                                        <div key={i} className="w-full flex items-center gap-2 p-2 bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 rounded-lg transition group">
+                                            <button onClick={() => jumpToTime(h.time)} className="flex-1 flex items-center gap-3 text-left">
+                                                <div className="relative w-20 h-12 bg-black rounded overflow-hidden shrink-0 border border-slate-600">
+                                                    {h.thumbnail && <img src={h.thumbnail} className="w-full h-full object-cover" alt="thumb"/>}
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition"><Icon name="play" size={16} className="text-white opacity-80" /></div>
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">Starts at {formatTime(h.time)}</p>
-                                            </div>
-                                            <Icon name="chevron-right" size={16} className="text-slate-600 ml-auto group-hover:text-slate-300" />
-                                        </button>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${h.type.toLowerCase().includes('six') ? 'bg-purple-500 text-white' : h.type.toLowerCase().includes('four') ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>{h.type}</span>
+                                                        <span className="text-xs font-mono text-slate-400">@{formatTime(h.eventTime)}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">Starts at {formatTime(h.time)}</p>
+                                                </div>
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteHighlight(i); }} className="p-2 text-slate-500 hover:text-red-400 transition">
+                                                <Icon name="trash-2" size={16} />
+                                            </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
