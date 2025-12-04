@@ -315,6 +315,9 @@
 
                 let lastCheckTime = -1;
                 const checkInterval = 0.5;
+                
+                // Track last match time to prevent duplicate detections of the same event
+                let lastMatchTime = -10; 
 
                 const processLoop = () => {
                     if (video.paused || video.ended) {
@@ -327,58 +330,70 @@
 
                     if (vTime - lastCheckTime >= checkInterval) {
                         lastCheckTime = vTime;
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        ctx.drawImage(video, 0, 0);
-
-                        // Improved Scan Logic with Corrected Coordinates
-                        const containerRect = containerRef.current.getBoundingClientRect();
-                        const videoRect = video.getBoundingClientRect();
                         
-                        const offsetX = videoRect.left - containerRect.left;
-                        const offsetY = videoRect.top - containerRect.top;
-                        const scaleX = video.videoWidth / videoRect.width;
-                        const scaleY = video.videoHeight / videoRect.height;
+                        // --- COOLDOWN LOGIC START ---
+                        // If we found a match recently (within 10 seconds), SKIP scanning.
+                        if (vTime - lastMatchTime < 10) {
+                            // Do nothing, just wait for cooldown to pass
+                        } else {
+                            // Safe to scan
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            ctx.drawImage(video, 0, 0);
 
-                        let matchedLabel = null;
+                            // Improved Scan Logic with Corrected Coordinates
+                            const containerRect = containerRef.current.getBoundingClientRect();
+                            const videoRect = video.getBoundingClientRect();
+                            
+                            const offsetX = videoRect.left - containerRect.left;
+                            const offsetY = videoRect.top - containerRect.top;
+                            const scaleX = video.videoWidth / videoRect.width;
+                            const scaleY = video.videoHeight / videoRect.height;
 
-                        for (let trigger of triggers) {
-                            // Map visual rect to video pixels
-                            const rawX = (trigger.rect.x - offsetX) * scaleX;
-                            const rawY = (trigger.rect.y - offsetY) * scaleY;
-                            const rawW = trigger.rect.w * scaleX;
-                            const rawH = trigger.rect.h * scaleY;
+                            let matchedLabel = null;
 
-                            const x = Math.max(0, Math.floor(rawX));
-                            const y = Math.max(0, Math.floor(rawY));
-                            const w = Math.min(Math.floor(rawW), video.videoWidth - x);
-                            const h = Math.min(Math.floor(rawH), video.videoHeight - y);
+                            for (let trigger of triggers) {
+                                // Map visual rect to video pixels
+                                const rawX = (trigger.rect.x - offsetX) * scaleX;
+                                const rawY = (trigger.rect.y - offsetY) * scaleY;
+                                const rawW = trigger.rect.w * scaleX;
+                                const rawH = trigger.rect.h * scaleY;
 
-                            if (w <= 0 || h <= 0) continue;
+                                const x = Math.max(0, Math.floor(rawX));
+                                const y = Math.max(0, Math.floor(rawY));
+                                const w = Math.min(Math.floor(rawW), video.videoWidth - x);
+                                const h = Math.min(Math.floor(rawH), video.videoHeight - y);
 
-                            const imageData = ctx.getImageData(x, y, w, h);
-                            const avgColor = getAverageColor(imageData);
-                            const distance = getColorDistance(avgColor, trigger.color);
+                                if (w <= 0 || h <= 0) continue;
 
-                            if (distance < trigger.tolerance) {
-                                matchedLabel = trigger.label;
-                                break;
+                                const imageData = ctx.getImageData(x, y, w, h);
+                                const avgColor = getAverageColor(imageData);
+                                const distance = getColorDistance(avgColor, trigger.color);
+
+                                if (distance < trigger.tolerance) {
+                                    matchedLabel = trigger.label;
+                                    break;
+                                }
+                            }
+
+                            if (matchedLabel) {
+                                lastMatchTime = vTime; // UPDATE COOLDOWN TIMESTAMP
+                                setHighlights(prev => {
+                                    const last = prev[prev.length - 1];
+                                    // Extra safety check in React state
+                                    if (last && (vTime - last.eventTime < 10)) return prev;
+                                    
+                                    const adjustedStartTime = Math.max(0, vTime - preRoll);
+                                    return [...prev, { 
+                                        time: adjustedStartTime,
+                                        eventTime: vTime, 
+                                        type: matchedLabel, 
+                                        thumbnail: canvas.toDataURL('image/jpeg', 0.5) 
+                                    }];
+                                });
                             }
                         }
-
-                        if (matchedLabel) {
-                            setHighlights(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last && (vTime - last.eventTime < 5)) return prev;
-                                const adjustedStartTime = Math.max(0, vTime - preRoll);
-                                return [...prev, { 
-                                    time: adjustedStartTime,
-                                    eventTime: vTime, 
-                                    type: matchedLabel, 
-                                    thumbnail: canvas.toDataURL('image/jpeg', 0.5) 
-                                }];
-                            });
-                        }
+                        // --- COOLDOWN LOGIC END ---
                     }
                     scanRequestRef.current = requestAnimationFrame(processLoop);
                 };
@@ -571,6 +586,12 @@
                             </div>
                             <h1 className="font-bold text-xl tracking-tight">CricketScan <span className="text-green-400 font-normal">AI</span></h1>
                         </div>
+                        
+                        {/* Added Credit Text */}
+                        <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400">
+                            Created by: Amanullah Khan
+                        </div>
+
                         <div className="flex items-center gap-4">
                             {!videoSrc && (
                                 <label key={resetKey} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-full cursor-pointer transition">
