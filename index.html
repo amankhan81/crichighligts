@@ -740,6 +740,9 @@
                                         <Icon name="clapperboard" size={16} className="text-emerald-400" />
                                         <h2 className="text-xs font-bold uppercase tracking-widest">Highlights</h2>
                                     </div>
+                                    
+                                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{highlights.length} found</span>
+
                                     {highlights.length > 0 && (
                                         <button onClick={exportHighlights} disabled={isExporting} 
                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-[10px] font-bold uppercase tracking-wider transition shadow-lg shadow-indigo-900/50 disabled:opacity-50 disabled:cursor-not-allowed">
