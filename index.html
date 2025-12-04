@@ -736,12 +736,15 @@
                             {/* Panel: Highlights */}
                             <div className="flex-1 flex flex-col overflow-hidden bg-slate-950/30">
                                 <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
-                                    <div className="flex items-center gap-2 text-slate-100">
-                                        <Icon name="clapperboard" size={16} className="text-emerald-400" />
-                                        <h2 className="text-xs font-bold uppercase tracking-widest">Highlights</h2>
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+                                            <Icon name="clapperboard" size={16} className="text-emerald-400" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-100">Highlights</h2>
+                                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{highlights.length} found</span>
+                                        </div>
                                     </div>
-                                    
-                                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{highlights.length} found</span>
 
                                     {highlights.length > 0 && (
                                         <button onClick={exportHighlights} disabled={isExporting} 
