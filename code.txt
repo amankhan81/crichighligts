@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CricketScan AI - FHD Transitions</title>
+    
+    <!-- 
+      === OFFLINE INSTRUCTIONS ===
+      To work offline, download these files to a 'libs' folder and uncomment the local lines below, 
+      while removing the internet lines.
+    -->
+
+    <!-- 1. Tailwind CSS -->
+    <!-- Online: --> <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Offline: <script src="./libs/tailwind.js"></script> -->
+    
+    <!-- 2. React & ReactDOM -->
+    <!-- Online: -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Offline: 
+    <script src="./libs/react.js"></script>
+    <script src="./libs/react-dom.js"></script> 
+    -->
+    
+    <!-- 3. Babel -->
+    <!-- Online: --> <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Offline: <script src="./libs/babel.js"></script> -->
+
+    <!-- 4. Lucide Icons -->
+    <!-- Online: --> <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Offline: <script src="./libs/lucide.js"></script> -->
+    
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .group-box:hover .group-box-hover\:opacity-100 { opacity: 1; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- FIX: EXPLICITLY CAPTURE GLOBALS ---
+        const React = window.React;
+        const ReactDOM = window.ReactDOM;
+
+        // Safety check to ensure libraries loaded
+        if (!React || !ReactDOM) {
+            document.getElementById('root').innerHTML = `
+                <div style="padding: 20px; color: #ef4444; font-family: sans-serif;">
+                    <h2 style="font-size: 24px; margin-bottom: 10px;">Critical Error: Libraries Failed to Load</h2>
+                    <p>React or ReactDOM could not be found. Please check:</p>
+                    <ul style="margin-top: 10px; list-style: disc; padding-left: 20px;">
+                        <li>If online: Check your internet connection.</li>
+                        <li>If offline: Ensure you have downloaded the files into a 'libs' folder and uncommented the offline scripts in the HTML code.</li>
+                    </ul>
+                </div>
+            `;
+            throw new Error("React/ReactDOM not found");
+        }
+
+        const { useState, useRef, useEffect } = React;
+        
+        // --- FIXED ICON COMPONENT ---
+        const Icon = ({ name, size = 24, className }) => {
+            const ref = useRef(null);
+
+            useEffect(() => {
+                if (!window.lucide || !ref.current) return;
+                ref.current.innerHTML = '';
+                const pascalName = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+                const iconData = window.lucide.icons[pascalName];
+
+                if (iconData) {
+                    const svgElement = window.lucide.createElement(iconData);
+                    svgElement.setAttribute('width', size);
+                    svgElement.setAttribute('height', size);
+                    if (className) {
+                        const existingClass = svgElement.getAttribute('class') || '';
+                        svgElement.setAttribute('class', `${existingClass} ${className}`);
+                    }
+                    ref.current.appendChild(svgElement);
+                }
+            }, [name, size, className]);
+
+            return <span ref={ref} className="inline-flex items-center justify-center"></span>;
+        };
+
+        const getColorDistance = (c1, c2) => Math.sqrt(Math.pow(c1.r - c2.r, 2) + Math.pow(c1.g - c2.g, 2) + Math.pow(c1.b - c2.b, 2));
+
+        const getAverageColor = (imageData) => {
+            let r = 0, g = 0, b = 0;
+            const totalPixels = imageData.width * imageData.height;
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                r += imageData.data[i];
+                g += imageData.data[i + 1];
+                b += imageData.data[i + 2];
+            }
+            return {
+                r: Math.round(r / totalPixels),
+                g: Math.round(g / totalPixels),
+                b: Math.round(b / totalPixels),
+            };
+        };
+
+        const rgbToHex = ({ r, g, b }) => "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+
+        const App = () => {
+            const [videoSrc, setVideoSrc] = useState(null);
+            const [triggers, setTriggers] = useState([]);
+            const [highlights, setHighlights] = useState([]);
+            const [isScanning, setIsScanning] = useState(false);
+            const [isExporting, setIsExporting] = useState(false);
+            const [progress, setProgress] = useState(0); 
+            const [currentTime, setCurrentTime] = useState(0);
+            const [duration, setDuration] = useState(0);
+            const [isPlaying, setIsPlaying] = useState(false);
+            
+            const [preRoll, setPreRoll] = useState(5); 
+            const [clipDuration, setClipDuration] = useState(10); 
+            const [scanSpeed, setScanSpeed] = useState(5); 
+
+            const [isDrawing, setIsDrawing] = useState(false);
+            const [startPos, setStartPos] = useState(null);
+            const [currentRect, setCurrentRect] = useState(null);
+            const [showTriggerModal, setShowTriggerModal] = useState(false);
+            const [tempTriggerColor, setTempTriggerColor] = useState(null);
+            const [resetKey, setResetKey] = useState(0); 
+
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const containerRef = useRef(null);
+            const scanRequestRef = useRef(null);
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                event.target.value = '';
+                if (file) {
+                    try {
+                        const url = URL.createObjectURL(file);
+                        setVideoSrc(url);
+                        setHighlights([]);
+                        setTriggers([]);
+                        setProgress(0);
+                        setIsPlaying(false);
+                    } catch (err) {
+                        alert("Error loading video file: " + err.message);
+                    }
+                }
+            };
+
+            const resetApp = () => {
+                if (window.confirm("Start over? This will clear the video, triggers, and highlights.")) {
+                    if (scanRequestRef.current) cancelAnimationFrame(scanRequestRef.current);
+                    if (videoSrc) URL.revokeObjectURL(videoSrc);
+                    setVideoSrc(null);
+                    setTriggers([]);
+                    setHighlights([]);
+                    setProgress(0);
+                    setCurrentTime(0);
+                    setDuration(0);
+                    setIsPlaying(false);
+                    setIsScanning(false);
+                    setIsExporting(false);
+                    setResetKey(prev => prev + 1); 
+                }
+            };
+
+            const handleTimeUpdate = () => {
+                if (videoRef.current && !isScanning && !isExporting) {
+                    setCurrentTime(videoRef.current.currentTime);
+                }
+            };
+
+            const handleLoadedMetadata = () => {
+                if (videoRef.current) setDuration(videoRef.current.duration);
+            };
+
+            const togglePlay = () => {
+                if (videoRef.current) {
+                    if (isPlaying) videoRef.current.pause();
+                    else videoRef.current.play();
+                    setIsPlaying(!isPlaying);
+                }
+            };
+
+            const startDrawing = (e) => {
+                if (!videoSrc || isScanning || isExporting) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setIsDrawing(true);
+                setStartPos({ x, y });
+                setCurrentRect({ x, y, w: 0, h: 0 });
+            };
+
+            const draw = (e) => {
+                if (!isDrawing) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                setCurrentRect({
+                    x: Math.min(x, startPos.x),
+                    y: Math.min(y, startPos.y),
+                    w: Math.abs(x - startPos.x),
+                    h: Math.abs(y - startPos.y)
+                });
+            };
+
+            const endDrawing = () => {
+                if (!isDrawing) return;
+                setIsDrawing(false);
+                if (currentRect && currentRect.w > 10 && currentRect.h > 10) {
+                    analyzeRegionForTrigger();
+                } else {
+                    setCurrentRect(null);
+                }
+            };
+
+            const analyzeRegionForTrigger = () => {
+                if (!videoRef.current || !canvasRef.current || !containerRef.current) return;
+                const video = videoRef.current;
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                
+                // 1. Snapshot the video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // 2. Get Layout Coordinates
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const videoRect = video.getBoundingClientRect(); // This gives the *actual* rendered video size
+
+                // 3. Calculate offsets (if video is letterboxed/centered)
+                const offsetX = videoRect.left - containerRect.left;
+                const offsetY = videoRect.top - containerRect.top;
+
+                // 4. Calculate Scale Factors relative to the VIDEO element, not the container
+                const scaleX = video.videoWidth / videoRect.width;
+                const scaleY = video.videoHeight / videoRect.height;
+
+                // 5. Map Mouse Rect to Video Pixels
+                // We subtract the offsets to make coordinates relative to the video, not the container
+                const rawX = (currentRect.x - offsetX) * scaleX;
+                const rawY = (currentRect.y - offsetY) * scaleY;
+                const rawW = currentRect.w * scaleX;
+                const rawH = currentRect.h * scaleY;
+
+                // 6. Clamp to valid bounds (prevent crash if user selected black bars)
+                const x = Math.max(0, Math.floor(rawX));
+                const y = Math.max(0, Math.floor(rawY));
+                // Ensure width/height don't go off the canvas
+                const w = Math.min(Math.floor(rawW), video.videoWidth - x);
+                const h = Math.min(Math.floor(rawH), video.videoHeight - y);
+
+                if (w <= 0 || h <= 0) {
+                    alert("Please select an area inside the video, not the black borders.");
+                    setCurrentRect(null);
+                    return;
+                }
+
+                const region = { x, y, w, h };
+
+                try {
+                    const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
+                    const avgColor = getAverageColor(imageData);
+                    setTempTriggerColor(avgColor);
+                    setShowTriggerModal(true);
+                } catch (e) {
+                    console.error("Failed to get image data", e);
+                    setCurrentRect(null);
+                }
+            };
+
+            const saveTrigger = (label) => {
+                const newTrigger = {
+                    id: Date.now(),
+                    rect: currentRect,
+                    color: tempTriggerColor,
+                    label: label,
+                    tolerance: 50
+                };
+                setTriggers([...triggers, newTrigger]);
+                setShowTriggerModal(false);
+                setCurrentRect(null);
+            };
+
+            const stopScan = () => {
+                if (scanRequestRef.current) cancelAnimationFrame(scanRequestRef.current);
+                setIsScanning(false);
+                if (videoRef.current) {
+                    videoRef.current.pause();
+                    videoRef.current.playbackRate = 1.0;
+                    videoRef.current.muted = false;
+                    videoRef.current.currentTime = 0;
+                }
+                setProgress(0);
+            };
+
+            const startScan = async () => {
+                if (!videoRef.current || triggers.length === 0) return;
+                setIsScanning(true);
+                setHighlights([]);
+                const video = videoRef.current;
+                const canvas = document.createElement('canvas'); 
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                
+                video.muted = true;
+                try { await video.play(); } catch(err) { console.error("Autoplay failed", err); }
+                video.playbackRate = scanSpeed;
+
+                let lastCheckTime = -1;
+                const checkInterval = 0.5;
+
+                const processLoop = () => {
+                    if (video.paused || video.ended) {
+                        stopScan();
+                        return;
+                    }
+
+                    const vTime = video.currentTime;
+                    setProgress((vTime / video.duration) * 100);
+
+                    if (vTime - lastCheckTime >= checkInterval) {
+                        lastCheckTime = vTime;
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0);
+
+                        // Improved Scan Logic with Corrected Coordinates
+                        const containerRect = containerRef.current.getBoundingClientRect();
+                        const videoRect = video.getBoundingClientRect();
+                        
+                        const offsetX = videoRect.left - containerRect.left;
+                        const offsetY = videoRect.top - containerRect.top;
+                        const scaleX = video.videoWidth / videoRect.width;
+                        const scaleY = video.videoHeight / videoRect.height;
+
+                        let matchedLabel = null;
+
+                        for (let trigger of triggers) {
+                            // Map visual rect to video pixels
+                            const rawX = (trigger.rect.x - offsetX) * scaleX;
+                            const rawY = (trigger.rect.y - offsetY) * scaleY;
+                            const rawW = trigger.rect.w * scaleX;
+                            const rawH = trigger.rect.h * scaleY;
+
+                            const x = Math.max(0, Math.floor(rawX));
+                            const y = Math.max(0, Math.floor(rawY));
+                            const w = Math.min(Math.floor(rawW), video.videoWidth - x);
+                            const h = Math.min(Math.floor(rawH), video.videoHeight - y);
+
+                            if (w <= 0 || h <= 0) continue;
+
+                            const imageData = ctx.getImageData(x, y, w, h);
+                            const avgColor = getAverageColor(imageData);
+                            const distance = getColorDistance(avgColor, trigger.color);
+
+                            if (distance < trigger.tolerance) {
+                                matchedLabel = trigger.label;
+                                break;
+                            }
+                        }
+
+                        if (matchedLabel) {
+                            setHighlights(prev => {
+                                const last = prev[prev.length - 1];
+                                if (last && (vTime - last.eventTime < 5)) return prev;
+                                const adjustedStartTime = Math.max(0, vTime - preRoll);
+                                return [...prev, { 
+                                    time: adjustedStartTime,
+                                    eventTime: vTime, 
+                                    type: matchedLabel, 
+                                    thumbnail: canvas.toDataURL('image/jpeg', 0.5) 
+                                }];
+                            });
+                        }
+                    }
+                    scanRequestRef.current = requestAnimationFrame(processLoop);
+                };
+                scanRequestRef.current = requestAnimationFrame(processLoop);
+            };
+
+            // --- EXPORT LOGIC WITH TRANSITIONS & 10MBPS ---
+            const exportHighlights = async () => {
+                if (highlights.length === 0 || !videoRef.current) return;
+                setIsExporting(true);
+                setProgress(0);
+                
+                const video = videoRef.current;
+                const originalTime = video.currentTime;
+                
+                video.pause();
+                video.playbackRate = 1.0; 
+                video.muted = false;
+                video.volume = 1.0;
+
+                // 1. SETUP CANVAS PIPELINE FOR TRANSITIONS
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = video.videoWidth; // Use source resolution (FHD/4K etc)
+                exportCanvas.height = video.videoHeight;
+                const ctx = exportCanvas.getContext('2d', { alpha: false }); // Optimize for video
+
+                // 2. SETUP STREAMS
+                let audioStream;
+                // We need to capture the audio stream from the video element
+                if (video.captureStream) audioStream = video.captureStream();
+                else if (video.mozCaptureStream) audioStream = video.mozCaptureStream();
+                else {
+                    alert("Browser does not support capturing video stream.");
+                    setIsExporting(false);
+                    return;
+                }
+
+                // Get streams
+                const audioTracks = audioStream.getAudioTracks();
+                const canvasStream = exportCanvas.captureStream(60); // Request 60FPS from canvas
+                const finalStream = new MediaStream([
+                    ...canvasStream.getVideoTracks(),
+                    ...(audioTracks.length > 0 ? [audioTracks[0]] : [])
+                ]);
+
+                // 3. RECORDER SETUP (WebM + 10Mbps)
+                let mimeType = "video/webm;codecs=vp9,opus"; 
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm;codecs=vp8,opus";
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "video/webm"; 
+
+                const recorder = new MediaRecorder(finalStream, { 
+                    mimeType, 
+                    videoBitsPerSecond: 10000000 // 10 Mbps FHD
+                });
+
+                const chunks = [];
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                recorder.start();
+                recorder.pause();
+
+                const sortedHighlights = [...highlights].sort((a, b) => a.time - b.time);
+                let animationFrameId;
+
+                // 4. RENDER LOOP (Handles Drawing + Transitions)
+                // This variable tracks which clip we are currently rendering for transition logic
+                let currentClipData = null;
+
+                const renderLoop = () => {
+                    if (!video.paused && !video.ended && currentClipData) {
+                        // Draw Video Frame
+                        ctx.drawImage(video, 0, 0, exportCanvas.width, exportCanvas.height);
+                        
+                        // Calculate Transition Overlay
+                        const t = video.currentTime;
+                        const { start, end } = currentClipData;
+                        const fadeDuration = 0.5; // 0.5s fade
+
+                        if (t >= start && t < start + fadeDuration) {
+                            // Fade In (Black -> Transparent)
+                            const alpha = 1 - ((t - start) / fadeDuration);
+                            ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
+                            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                        } else if (t > end - fadeDuration && t <= end) {
+                            // Fade Out (Transparent -> Black)
+                            const alpha = 1 - ((end - t) / fadeDuration);
+                            ctx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
+                            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                        }
+                    }
+                    animationFrameId = requestAnimationFrame(renderLoop);
+                };
+                
+                // Start the render loop immediately
+                renderLoop();
+
+                for (let i = 0; i < sortedHighlights.length; i++) {
+                    const h = sortedHighlights[i];
+                    const start = h.time;
+                    const end = Math.min(video.duration, start + clipDuration);
+                    
+                    // Update current clip data for the render loop
+                    currentClipData = { start, end };
+
+                    // Pre-roll logic
+                    const preBuffer = 2.0; 
+                    const seekTarget = Math.max(0, start - preBuffer);
+                    const isRollingStart = start > preBuffer; 
+
+                    video.currentTime = seekTarget;
+                    
+                    await new Promise(resolve => {
+                        const onSeeked = () => {
+                            video.removeEventListener('seeked', onSeeked);
+                            setTimeout(resolve, 500); 
+                        };
+                        video.addEventListener('seeked', onSeeked);
+                    });
+
+                    try { await video.play(); } catch (e) { console.error("Playback failed", e); }
+
+                    if (isRollingStart) {
+                        await new Promise(resolve => {
+                            const checkFrame = () => {
+                                if (video.paused) { resolve(); return; }
+                                if (video.currentTime >= start) { resolve(); } 
+                                else { requestAnimationFrame(checkFrame); }
+                            };
+                            requestAnimationFrame(checkFrame);
+                        });
+                    }
+
+                    if (recorder.state === "paused") recorder.resume();
+
+                    await new Promise(resolve => {
+                        const checkEndFrame = () => {
+                            if (video.paused) { resolve(); return; }
+                            if (video.currentTime >= end) { resolve(); } 
+                            else { requestAnimationFrame(checkEndFrame); }
+                        };
+                        requestAnimationFrame(checkEndFrame);
+                    });
+
+                    video.pause();
+                    recorder.pause();
+                    setProgress(Math.round(((i + 1) / sortedHighlights.length) * 100));
+                }
+
+                // Cleanup
+                cancelAnimationFrame(animationFrameId);
+                recorder.stop();
+                await new Promise(resolve => { recorder.onstop = resolve; });
+
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cricket_highlights.webm`; 
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                setIsExporting(false);
+                setProgress(0);
+                video.currentTime = originalTime;
+            };
+
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            const jumpToTime = (time) => {
+                if (videoRef.current) {
+                    videoRef.current.currentTime = time;
+                    setIsPlaying(false);
+                    videoRef.current.pause();
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
+                    <header className="h-16 border-b border-slate-700 bg-slate-800 flex items-center justify-between px-6 shrink-0 relative z-10">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                                <Icon name="video" size={20} className="text-white" />
+                            </div>
+                            <h1 className="font-bold text-xl tracking-tight">CricketScan <span className="text-green-400 font-normal">AI</span></h1>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {!videoSrc && (
+                                <label key={resetKey} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-full cursor-pointer transition">
+                                    <Icon name="upload" size={16} />
+                                    <span className="text-sm font-medium">Upload Match Video</span>
+                                    <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+                                </label>
+                            )}
+                            {videoSrc && !isScanning && !isExporting && (
+                                <>
+                                    <button onClick={resetApp} className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-red-600 rounded-full font-medium transition text-slate-200 hover:text-white" title="Reset Project">
+                                        <Icon name="rotate-ccw" size={16} />
+                                        <span className="text-xs">Reset</span>
+                                    </button>
+                                    <button onClick={startScan} disabled={triggers.length === 0} className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${triggers.length > 0 ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}>
+                                        <Icon name="zap" size={16} className="fill-current" />
+                                        Start {scanSpeed}x Scan
+                                    </button>
+                                </>
+                            )}
+                            {(isScanning || isExporting) && (
+                                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-full">
+                                    <div className="w-4 h-4 border-2 border-green-500 border-t-transparent animate-spin rounded-full"></div>
+                                    <span className="text-sm text-green-400 font-mono">
+                                        {isExporting ? 'Exporting FHD Transitions' : 'Fast Scanning'} {Math.round(progress)}%
+                                    </span>
+                                    {isScanning && (
+                                        <button onClick={stopScan} className="ml-2 text-xs text-red-400 hover:text-red-300">Stop</button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden">
+                        <div className="flex-1 bg-black relative flex flex-col justify-center items-center overflow-hidden group">
+                            {!videoSrc ? (
+                                <div className="text-center text-slate-500 p-8 border-2 border-dashed border-slate-700 rounded-xl">
+                                    <Icon name="upload" size={48} className="mx-auto mb-4 opacity-50" />
+                                    <p className="text-lg">Upload a video to get started</p>
+                                    <p className="text-sm opacity-60">Supports MP4, WebM</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div ref={containerRef} className="relative shadow-2xl max-h-full aspect-video"
+                                        onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={endDrawing}
+                                        style={{ cursor: isDrawing ? 'crosshair' : 'default' }}>
+                                        <video ref={videoRef} src={videoSrc} className="max-h-full max-w-full pointer-events-none" 
+                                            onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} crossOrigin="anonymous" playsInline 
+                                        />
+                                        <canvas ref={canvasRef} className="hidden" />
+                                        {currentRect && (
+                                            <div className="absolute border-2 border-green-400 bg-green-400/20"
+                                                style={{ left: currentRect.x, top: currentRect.y, width: currentRect.w, height: currentRect.h }} />
+                                        )}
+                                        {triggers.map(t => (
+                                            <div key={t.id} className="absolute border-2 border-yellow-400/50 hover:border-yellow-400 hover:bg-yellow-400/10 group-box transition-colors"
+                                                style={{ left: t.rect.x, top: t.rect.y, width: t.rect.w, height: t.rect.h }}>
+                                                <span className="absolute -top-6 left-0 bg-yellow-400 text-black text-xs font-bold px-1 rounded shadow-sm opacity-0 group-box-hover:opacity-100 transition-opacity">
+                                                    {t.label}
+                                                </span>
+                                            </div>
+                                        ))}
+                                        <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity flex items-center gap-4 ${isExporting ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
+                                            <button onClick={togglePlay} className="p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md">
+                                                {isPlaying ? <Icon name="pause" size={20} className="text-white" /> : <Icon name="play" size={20} className="text-white" />}
+                                            </button>
+                                            <input type="range" min="0" max={duration || 100} value={currentTime} 
+                                                onChange={(e) => { const t = Number(e.target.value); videoRef.current.currentTime = t; setCurrentTime(t); }}
+                                                className="flex-1 accent-green-500 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                            />
+                                            <span className="text-xs font-mono text-white/80">{formatTime(currentTime)} / {formatTime(duration)}</span>
+                                        </div>
+                                        {isExporting && (
+                                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
+                                                <div className="text-center space-y-4">
+                                                    <Icon name="film" size={64} className="text-green-500 animate-pulse mx-auto" />
+                                                    <h2 className="text-2xl font-bold text-white">Exporting Video</h2>
+                                                    <p className="text-slate-400">10Mbps FHD + Transitions...</p>
+                                                    <p className="text-slate-500 text-sm">Do not close this tab</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {triggers.length === 0 && (
+                                        <div className="absolute top-6 bg-black/80 backdrop-blur border border-slate-700 text-slate-200 px-6 py-3 rounded-full shadow-xl flex items-center gap-3 animate-fade-in-up pointer-events-none">
+                                            <Icon name="crosshair" size={20} className="text-green-400" />
+                                            <div>
+                                                <p className="text-sm font-semibold">How to create a trigger:</p>
+                                                <p className="text-xs opacity-70">Pause on "SIX" → Draw box around the unique color.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col shrink-0">
+                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                                <div className="flex items-center gap-2 mb-3 text-slate-300">
+                                    <Icon name="settings" size={16} />
+                                    <h2 className="text-sm font-semibold uppercase tracking-wider">Scan Settings</h2>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
+                                            <span>Scan Speed</span><span className="text-green-400">{scanSpeed}x</span>
+                                        </div>
+                                        <input type="range" min="1" max="8" step="1" value={scanSpeed} onChange={(e) => setScanSpeed(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
+                                            <span>Pre-event Capture</span><span className="text-green-400">{preRoll} sec</span>
+                                        </div>
+                                        <input type="range" min="0" max="30" step="1" value={preRoll} onChange={(e) => setPreRoll(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-xs text-slate-400 mb-1">
+                                            <span>Clip Length</span><span className="text-green-400">{clipDuration} sec</span>
+                                        </div>
+                                        <input type="range" min="5" max="60" step="1" value={clipDuration} onChange={(e) => setClipDuration(Number(e.target.value))} className="w-full accent-green-500 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Triggers</h2>
+                                    <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full text-slate-400">{triggers.length}</span>
+                                </div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {triggers.length === 0 ? <div className="text-center py-6 text-slate-500 text-sm italic">No triggers set.</div> : 
+                                    triggers.map(t => (
+                                        <div key={t.id} className="flex items-center justify-between bg-slate-700/50 p-2 rounded border border-slate-600">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: rgbToHex(t.color) }}></div>
+                                                <span className="text-sm font-medium">{t.label}</span>
+                                            </div>
+                                            <button onClick={() => setTriggers(triggers.filter(tr => tr.id !== t.id))} className="text-slate-500 hover:text-red-400"><Icon name="trash-2" size={12} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                                    <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Highlights</h2>
+                                    {highlights.length > 0 && (
+                                        <button onClick={exportHighlights} disabled={isExporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            {isExporting ? <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <Icon name="download" size={12} />}
+                                            Export Reel
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                                    {highlights.length === 0 ? <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-60"><Icon name="clock" size={32} className="mb-2" /><p className="text-sm">Scan result will appear here</p></div> : 
+                                    highlights.map((h, i) => (
+                                        <button key={i} onClick={() => jumpToTime(h.time)} className="w-full flex items-center gap-3 p-2 bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 rounded-lg transition group text-left">
+                                            <div className="relative w-20 h-12 bg-black rounded overflow-hidden shrink-0 border border-slate-600">
+                                                {h.thumbnail && <img src={h.thumbnail} className="w-full h-full object-cover" alt="thumb"/>}
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition"><Icon name="play" size={16} className="text-white opacity-80" /></div>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${h.type.toLowerCase().includes('six') ? 'bg-purple-500 text-white' : h.type.toLowerCase().includes('four') ? 'bg-blue-500 text-white' : 'bg-red-500 text-white'}`}>{h.type}</span>
+                                                    <span className="text-xs font-mono text-slate-400">@{formatTime(h.eventTime)}</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">Starts at {formatTime(h.time)}</p>
+                                            </div>
+                                            <Icon name="chevron-right" size={16} className="text-slate-600 ml-auto group-hover:text-slate-300" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {showTriggerModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                <div className="bg-slate-800 border border-slate-600 p-6 rounded-xl shadow-2xl w-80 transform transition-all scale-100">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Icon name="check-circle" size={20} className="text-green-400" /> New Trigger</h3>
+                                    <div className="mb-4">
+                                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Selected Color</label>
+                                        <div className="flex items-center gap-3 p-2 bg-slate-900 rounded border border-slate-700">
+                                            <div className="w-8 h-8 rounded shadow-sm border border-slate-600" style={{ backgroundColor: tempTriggerColor ? rgbToHex(tempTriggerColor) : '#000' }} />
+                                            <span className="font-mono text-sm text-slate-300">{tempTriggerColor ? rgbToHex(tempTriggerColor) : '...'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="mb-6">
+                                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Event Name</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {['SIX', 'FOUR', 'WICKET', 'Wide'].map(preset => <button key={preset} onClick={() => saveTrigger(preset)} className="py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition">{preset}</button>)}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { setShowTriggerModal(false); setCurrentRect(null); }} className="w-full py-2 text-sm text-slate-400 hover:text-white transition">Cancel</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
