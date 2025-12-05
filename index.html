@@ -60,23 +60,37 @@
     <div id="root" class="h-screen w-screen flex flex-col"></div>
 
     <script type="text/babel">
+        // --- FIX: EXPLICITLY CAPTURE GLOBALS ---
         const React = window.React;
         const ReactDOM = window.ReactDOM;
 
+        // Safety check to ensure libraries loaded
         if (!React || !ReactDOM) {
-            throw new Error("React/ReactDOM not found. Check internet connection or offline setup.");
+            document.getElementById('root').innerHTML = `
+                <div style="padding: 20px; color: #ef4444; font-family: sans-serif;">
+                    <h2 style="font-size: 24px; margin-bottom: 10px;">Critical Error: Libraries Failed to Load</h2>
+                    <p>React or ReactDOM could not be found. Please check:</p>
+                    <ul style="margin-top: 10px; list-style: disc; padding-left: 20px;">
+                        <li>If online: Check your internet connection.</li>
+                        <li>If offline: Ensure you have downloaded the files into a 'libs' folder and uncommented the offline scripts in the HTML code.</li>
+                    </ul>
+                </div>
+            `;
+            throw new Error("React/ReactDOM not found");
         }
 
         const { useState, useRef, useEffect } = React;
         
-        // --- ICON COMPONENT ---
+        // --- FIXED ICON COMPONENT ---
         const Icon = ({ name, size = 24, className }) => {
             const ref = useRef(null);
+
             useEffect(() => {
                 if (!window.lucide || !ref.current) return;
                 ref.current.innerHTML = '';
                 const pascalName = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('');
                 const iconData = window.lucide.icons[pascalName];
+
                 if (iconData) {
                     const svgElement = window.lucide.createElement(iconData);
                     svgElement.setAttribute('width', size);
@@ -88,6 +102,7 @@
                     ref.current.appendChild(svgElement);
                 }
             }, [name, size, className]);
+
             return <span ref={ref} className="inline-flex items-center justify-center"></span>;
         };
 
@@ -130,6 +145,7 @@
             const [currentRect, setCurrentRect] = useState(null);
             const [showTriggerModal, setShowTriggerModal] = useState(false);
             const [tempTriggerColor, setTempTriggerColor] = useState(null);
+            const [newTriggerName, setNewTriggerName] = useState("Highlight Point"); // Custom Trigger Name State
             const [resetKey, setResetKey] = useState(0); 
 
             const videoRef = useRef(null);
@@ -149,13 +165,13 @@
                         setProgress(0);
                         setIsPlaying(false);
                     } catch (err) {
-                        alert("Error loading: " + err.message);
+                        alert("Error loading video file: " + err.message);
                     }
                 }
             };
 
             const resetApp = () => {
-                if (window.confirm("Start over? This will clear the current project.")) {
+                if (window.confirm("Start over? This will clear the video, triggers, and highlights.")) {
                     if (scanRequestRef.current) cancelAnimationFrame(scanRequestRef.current);
                     if (videoSrc) URL.revokeObjectURL(videoSrc);
                     setVideoSrc(null);
@@ -227,15 +243,15 @@
             };
 
             const analyzeRegionForTrigger = () => {
-                if (!videoRef.current || !canvasRef.current) return;
+                if (!videoRef.current || !canvasRef.current || !containerRef.current) return;
                 const video = videoRef.current;
                 const canvas = canvasRef.current;
                 const ctx = canvas.getContext('2d');
+                
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Simple scaling logic (Restored to previous working version)
                 const displayRect = containerRef.current.getBoundingClientRect();
                 const scaleX = video.videoWidth / displayRect.width;
                 const scaleY = video.videoHeight / displayRect.height;
@@ -251,19 +267,20 @@
                     const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
                     const avgColor = getAverageColor(imageData);
                     setTempTriggerColor(avgColor);
+                    setNewTriggerName("Highlight Point"); // Reset default name
                     setShowTriggerModal(true);
                 } catch (e) {
-                    console.error("Image Data Error", e);
+                    console.error("Failed to get image data", e);
                     setCurrentRect(null);
                 }
             };
 
-            const saveTrigger = (label) => {
+            const saveTrigger = () => {
                 const newTrigger = {
                     id: Date.now(),
                     rect: currentRect,
                     color: tempTriggerColor,
-                    label: label,
+                    label: newTriggerName || "Highlight Point", // Use the custom name
                     tolerance: 50
                 };
                 setTriggers([...triggers, newTrigger]);
@@ -324,6 +341,7 @@
 
                             let matchedLabel = null;
 
+                            // Scan ALL triggers
                             for (let trigger of triggers) {
                                 const region = {
                                     x: Math.floor(trigger.rect.x * scaleX),
@@ -331,6 +349,7 @@
                                     w: Math.floor(trigger.rect.w * scaleX),
                                     h: Math.floor(trigger.rect.h * scaleY),
                                 };
+
                                 if (region.w <= 0 || region.h <= 0) continue;
 
                                 const imageData = ctx.getImageData(region.x, region.y, region.w, region.h);
@@ -339,7 +358,7 @@
 
                                 if (distance < trigger.tolerance) {
                                     matchedLabel = trigger.label;
-                                    break;
+                                    break; // Found a match, stop checking other triggers
                                 }
                             }
 
@@ -348,6 +367,7 @@
                                 setHighlights(prev => {
                                     const last = prev[prev.length - 1];
                                     if (last && (vTime - last.eventTime < 10)) return prev;
+                                    
                                     const adjustedStartTime = Math.max(0, vTime - preRoll);
                                     return [...prev, { 
                                         time: adjustedStartTime,
@@ -364,6 +384,7 @@
                 scanRequestRef.current = requestAnimationFrame(processLoop);
             };
 
+            // --- EXPORT LOGIC WITH TRANSITIONS & 10MBPS ---
             const exportHighlights = async () => {
                 if (highlights.length === 0 || !videoRef.current) return;
                 setIsExporting(true);
@@ -813,16 +834,26 @@
                                     </div>
 
                                     <div className="mb-8">
-                                        <button onClick={() => saveTrigger('Highlight Point')} 
-                                            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-emerald-500/20 border border-white/10 flex items-center justify-center gap-2">
-                                            <Icon name="check" size={16} />
-                                            Save as Highlight Point
-                                        </button>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Event Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={newTriggerName}
+                                            onChange={(e) => setNewTriggerName(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                                            placeholder="e.g. Six, Wicket..."
+                                        />
                                     </div>
                                     
-                                    <button onClick={() => { setShowTriggerModal(false); setCurrentRect(null); }} className="w-full py-3 text-sm font-medium text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800">
-                                        Cancel
-                                    </button>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => { setShowTriggerModal(false); setCurrentRect(null); }} className="flex-1 py-3 text-sm font-medium text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800">
+                                            Cancel
+                                        </button>
+                                        <button onClick={saveTrigger} 
+                                            className="flex-[2] py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-emerald-500/20 border border-white/10 flex items-center justify-center gap-2">
+                                            <Icon name="check" size={16} />
+                                            Save Trigger
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
